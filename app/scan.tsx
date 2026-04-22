@@ -9,7 +9,7 @@ import { takePhoto, pickFromLibrary } from '../lib/image';
 import { parseReceipt } from '../lib/gemini';
 import { insertTransaction, getAccounts } from '../lib/db';
 import { EXPENSE_CATEGORIES, CATEGORY_COLORS, CATEGORY_ICONS } from '../types/finance';
-import { todayISO } from '../lib/format';
+import { todayISO, currentYM } from '../lib/format';
 import type { ParsedReceipt, Category, Account } from '../types/finance';
 import { useCallback } from 'react';
 
@@ -41,7 +41,9 @@ export default function ScanScreen() {
       setParsed(result);
       setMerchant(result.merchant);
       setTotal(result.total.toFixed(2));
-      setDate(result.date);
+      // Use parsed date only if it falls in the current month (checks are often old-dated)
+      const ym = currentYM();
+      setDate(result.date?.startsWith(ym) ? result.date : todayISO());
       setCategory(result.category);
       setIsCheck(result.documentType === 'check');
       setState('review');
