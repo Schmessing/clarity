@@ -8,7 +8,7 @@ import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   getAccounts, getTotalNetWorth, getRecentTransactions,
   getCategorySummary, getMonthlySummaries, getBudgetProgress,
-  insertTransaction, getDb,
+  insertTransaction, getMonthTotals,
 } from '../lib/db';
 import { formatCurrency, currentYM, formatMonth, todayISO } from '../lib/format';
 import AccountCard from '../components/AccountCard';
@@ -25,6 +25,7 @@ export default function Dashboard() {
   const [recent, setRecent] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<CategorySummary[]>([]);
   const [monthlies, setMonthlies] = useState<MonthlySummary[]>([]);
+  const [monthTotals, setMonthTotals] = useState({ income: 0, expenses: 0 });
   const [budgetAlerts, setBudgetAlerts] = useState<BudgetProgress[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -32,13 +33,14 @@ export default function Dashboard() {
   const ym = currentYM();
 
   const load = useCallback(async () => {
-    const [a, nw, r, cat, mon, bp] = await Promise.all([
+    const [a, nw, r, cat, mon, bp, totals] = await Promise.all([
       getAccounts(),
       getTotalNetWorth(),
       getRecentTransactions(8),
       getCategorySummary(ym),
       getMonthlySummaries(6),
       getBudgetProgress(ym),
+      getMonthTotals(ym),
     ]);
     setAccounts(a);
     setNetWorth(nw);
@@ -46,6 +48,7 @@ export default function Dashboard() {
     setCategories(cat);
     setMonthlies(mon);
     setBudgetAlerts(bp.filter((b) => b.pct >= 80));
+    setMonthTotals(totals);
   }, [ym]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -76,11 +79,11 @@ export default function Dashboard() {
           </View>
           <View style={styles.heroStats}>
             <View style={styles.heroStat}>
-              <Text style={styles.heroStatVal}>{formatCurrency(thisMonth?.income ?? 0)}</Text>
+              <Text style={styles.heroStatVal}>{formatCurrency(monthTotals.income)}</Text>
               <Text style={[styles.heroStatLabel, { color: '#10b981' }]}>↑ income</Text>
             </View>
             <View style={styles.heroStat}>
-              <Text style={styles.heroStatVal}>{formatCurrency(thisMonth?.expenses ?? 0)}</Text>
+              <Text style={styles.heroStatVal}>{formatCurrency(monthTotals.expenses)}</Text>
               <Text style={[styles.heroStatLabel, { color: '#ef4444' }]}>↓ spent</Text>
             </View>
           </View>

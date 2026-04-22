@@ -129,6 +129,22 @@ export async function getRecentTransactions(limit = 10): Promise<Transaction[]> 
   );
 }
 
+export async function getMonthTotals(ym: string): Promise<{ income: number; expenses: number }> {
+  const database = await getDb();
+  const rows = await database.getAllAsync<{ type: string; total: number }>(
+    `SELECT type, SUM(amount) as total FROM transactions
+     WHERE strftime('%Y-%m', date) = ? AND type IN ('income', 'expense')
+     GROUP BY type`,
+    [ym]
+  );
+  let income = 0, expenses = 0;
+  for (const r of rows) {
+    if (r.type === 'income') income = r.total ?? 0;
+    if (r.type === 'expense') expenses = r.total ?? 0;
+  }
+  return { income, expenses };
+}
+
 // ─── Budgets ──────────────────────────────────────────────────────────────────
 
 export async function getBudgets(month: string): Promise<Budget[]> {
