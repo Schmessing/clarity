@@ -1,14 +1,16 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { CATEGORY_COLORS, CATEGORY_ICONS } from '../types/finance';
 import { formatCurrency } from '../lib/format';
 import type { BudgetProgress } from '../types/finance';
 
 interface Props {
   budget: BudgetProgress;
+  onEdit: () => void;
+  onDelete: () => void;
 }
 
-export default function BudgetBar({ budget }: Props) {
+export default function BudgetBar({ budget, onEdit, onDelete }: Props) {
   const color = CATEGORY_COLORS[budget.category] ?? '#6b7280';
   const icon = CATEGORY_ICONS[budget.category] ?? '📦';
   const over = budget.spent > budget.amount;
@@ -26,6 +28,12 @@ export default function BudgetBar({ budget }: Props) {
             {formatCurrency(budget.spent)}
           </Text>
           <Text style={styles.of}> / {formatCurrency(budget.amount)}</Text>
+          <TouchableOpacity onPress={onEdit} style={styles.actionBtn} hitSlop={8}>
+            <Text style={styles.editIcon}>✏️</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onDelete} style={styles.actionBtn} hitSlop={8}>
+            <Text style={styles.deleteIcon}>🗑️</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -58,10 +66,13 @@ const styles = StyleSheet.create({
   left: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   icon: { fontSize: 18 },
   category: { fontSize: 15, fontWeight: '600', color: '#f9fafb' },
-  right: { flexDirection: 'row', alignItems: 'baseline' },
+  right: { flexDirection: 'row', alignItems: 'center' },
   spent: { fontSize: 15, fontWeight: '700', color: '#f9fafb' },
   of: { fontSize: 13, color: '#6b7280' },
   over: { color: '#ef4444' },
+  actionBtn: { marginLeft: 10 },
+  editIcon: { fontSize: 14 },
+  deleteIcon: { fontSize: 14 },
   track: {
     height: 6,
     backgroundColor: '#1f2937',

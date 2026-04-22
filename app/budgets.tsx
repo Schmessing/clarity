@@ -15,6 +15,7 @@ import type { BudgetProgress, Category } from '../types/finance';
 export default function BudgetsScreen() {
   const [progress, setProgress] = useState<BudgetProgress[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [editCategory, setEditCategory] = useState<Category>(EXPENSE_CATEGORIES[0]);
   const [editAmount, setEditAmount] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -23,7 +24,6 @@ export default function BudgetsScreen() {
   const load = useCallback(async () => {
     const data = await getBudgetProgress(ym);
     setProgress(data);
-    // Fire notifications for budgets >= 90%
     for (const b of data) {
       if (b.pct >= 90) await sendBudgetAlert(b.category, b.spent, b.amount);
     }
@@ -37,18 +37,54 @@ export default function BudgetsScreen() {
     setRefreshing(false);
   }, [load]);
 
+  const openAdd = () => {
+    setEditingId(null);
+    setEditCategory(EXPENSE_CATEGORIES[0]);
+    setEditAmount('');
+    setShowModal(true);
+  };
+
+  const openEdit = (b: BudgetProgress) => {
+    setEditingId(b.id ?? null);
+    setEditCategory(b.category);
+    setEditAmount(b.amount.toFixed(2));
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingId(null);
+    setEditAmount('');
+  };
+
   const saveBudget = async () => {
     const amt = parseFloat(editAmount);
     if (isNaN(amt) || amt <= 0) { Alert.alert('Invalid amount'); return; }
     await upsertBudget({ category: editCategory, amount: amt, month: ym });
-    setShowModal(false);
-    setEditAmount('');
+    closeModal();
     load();
+  };
+
+  const handleDelete = (b: BudgetProgress) => {
+    Alert.alert(
+      'Delete Budget',
+      `Remove the ${b.category} budget of ${formatCurrency(b.amount)}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive',
+          onPress: async () => {
+            if (b.id) { await deleteBudget(b.id); load(); }
+          },
+        },
+      ]
+    );
   };
 
   const totalBudgeted = progress.reduce((s, b) => s + b.amount, 0);
   const totalSpent = progress.reduce((s, b) => s + b.spent, 0);
   const overBudget = progress.filter((b) => b.spent > b.amount);
+  const isEditing = editingId !== null;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -61,12 +97,11 @@ export default function BudgetsScreen() {
             <Text style={styles.title}>Budgets</Text>
             <Text style={styles.month}>{formatMonth(ym)}</Text>
           </View>
-          <TouchableOpacity style={styles.addBtn} onPress={() => setShowModal(true)}>
+          <TouchableOpacity style={styles.addBtn} onPress={openAdd}>
             <Text style={styles.addBtnText}>+ Set Budget</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Summary card */}
         <View style={styles.summaryCard}>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryVal}>{formatCurrency(totalSpent)}</Text>
@@ -103,32 +138,41 @@ export default function BudgetsScreen() {
         )}
 
         {progress.map((b) => (
-          <BudgetBar key={b.category} budget={b} />
+          <BudgetBar
+            key={b.category}
+            budget={b}
+            onEdit={() => openEdit(b)}
+            onDelete={() => handleDelete(b)}
+          />
         ))}
       </ScrollView>
 
-      {/* Add / Edit Budget Modal */}
-      <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowModal(false)}>
+      <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeModal}>
         <View style={modal.container}>
           <View style={modal.header}>
-            <Text style={modal.title}>Set Budget</Text>
-            <TouchableOpacity onPress={() => setShowModal(false)}>
+            <Text style={modal.title}>{isEditing ? 'Edit Budget' : 'Set Budget'}</Text>
+            <TouchableOpacity onPress={closeModal}>
               <Text style={modal.cancel}>Cancel</Text>
             </TouchableOpacity>
           </View>
 
           <Text style={modal.label}>Category</Text>
-          <ScrollView style={{ maxHeight: 160, marginBottom: 16 }}>
+          <ScrollView style={{ maxHeight: 180, marginBottom: 16 }}>
             {EXPENSE_CATEGORIES.map((cat) => {
               const active = editCategory === cat;
+              // When editing, lock category to the one being edited
+              const disabled = isEditing && cat !== editCategory;
               return (
                 <TouchableOpacity
                   key={cat}
-                  style={[modal.catRow, active && modal.catRowActive]}
-                  onPress={() => setEditCategory(cat)}
+                  style={[modal.catRow, active && modal.catRowActive, disabled && modal.catRowDisabled]}
+                  onPress={() => !disabled && setEditCategory(cat)}
+                  activeOpacity={disabled ? 1 : 0.7}
                 >
                   <Text style={modal.catIcon}>{CATEGORY_ICONS[cat]}</Text>
-                  <Text style={[modal.catName, active && modal.catNameActive]}>{cat}</Text>
+                  <Text style={[modal.catName, active && modal.catNameActive, disabled && modal.catNameDisabled]}>
+                    {cat}
+                  </Text>
                   {active && <Text style={modal.check}>✓</Text>}
                 </TouchableOpacity>
               );
@@ -143,10 +187,11 @@ export default function BudgetsScreen() {
             keyboardType="decimal-pad"
             placeholder="e.g. 300"
             placeholderTextColor="#4b5563"
+            autoFocus
           />
 
           <TouchableOpacity style={modal.saveBtn} onPress={saveBudget}>
-            <Text style={modal.saveBtnText}>Save Budget</Text>
+            <Text style={modal.saveBtnText}>{isEditing ? 'Update Budget' : 'Save Budget'}</Text>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -198,9 +243,11 @@ const modal = StyleSheet.create({
     padding: 14, borderRadius: 10, marginBottom: 4, backgroundColor: '#111827',
   },
   catRowActive: { backgroundColor: '#0d1f1a', borderWidth: 1, borderColor: '#10b981' },
+  catRowDisabled: { opacity: 0.3 },
   catIcon: { fontSize: 18 },
   catName: { flex: 1, fontSize: 15, color: '#9ca3af' },
   catNameActive: { color: '#10b981', fontWeight: '600' },
+  catNameDisabled: { color: '#374151' },
   check: { fontSize: 16, color: '#10b981' },
   input: {
     backgroundColor: '#111827', borderRadius: 10, padding: 14,
