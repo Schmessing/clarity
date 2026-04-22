@@ -70,7 +70,8 @@ export default function ScanScreen() {
       setState('idle');
       setImageUri(null);
       setParsed(null);
-      router.replace('/');
+      setIsCheck(false);
+      router.replace({ pathname: '/', params: { refresh: Date.now() } });
     } catch (e: any) {
       Alert.alert('Save Failed', e.message);
       setState('review');

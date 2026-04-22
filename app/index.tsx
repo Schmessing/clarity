@@ -1,10 +1,10 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   RefreshControl, TouchableOpacity, Modal, TextInput, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   getAccounts, getTotalNetWorth, getRecentTransactions,
   getCategorySummary, getMonthlySummaries, getBudgetProgress,
@@ -19,6 +19,7 @@ import { EXPENSE_CATEGORIES, CATEGORY_COLORS } from '../types/finance';
 import type { Account, Transaction, CategorySummary, MonthlySummary, BudgetProgress } from '../types/finance';
 
 export default function Dashboard() {
+  const { refresh } = useLocalSearchParams<{ refresh?: string }>();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [netWorth, setNetWorth] = useState(0);
   const [recent, setRecent] = useState<Transaction[]>([]);
@@ -48,6 +49,7 @@ export default function Dashboard() {
   }, [ym]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+  useEffect(() => { if (refresh) load(); }, [refresh]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
